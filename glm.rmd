@@ -1,0 +1,197 @@
+---
+title: "glm"
+author: "Parth Patel"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+
+# Problem 1
+
+```{r}
+library(caret)
+library(glmnet)
+
+data(mtcars)
+```
+
+
+```{r}
+index <- createDataPartition(mtcars$mpg, p = 0.8, list = FALSE)
+train_data <- mtcars[index, ]
+test_data <- mtcars[-index, ]
+
+linear_model <- lm(mpg ~ ., data = train_data)
+
+summary(linear_model)
+
+```
+The t stat is not very good for any of the features, but wt may be the only feature that I would select. The coefficient for it is -4.35.
+
+
+```{r}
+X_train <- model.matrix(mpg ~ ., data = train_data)[, -1]
+y_train <- train_data$mpg
+
+lambda_values <- 10^seq(3, -2, length = 100)
+lambda_values
+```
+
+```{r}
+ridge_model <- cv.glmnet(X_train, y_train, alpha = 0, lambda = lambda_values, parallel = TRUE)
+
+plot(ridge_model)
+```
+
+```{r}
+min_lambda <- ridge_model$lambda.min
+cat("Minimum lambda:", min_lambda)
+```
+
+```{r}
+X_test <- model.matrix(mpg ~ ., data = test_data)[, -1]
+y_test <- test_data$mpg
+ridge_predictions <- predict(ridge_model, newx = X_test, s = min_lambda)
+```
+
+```{r}
+mse_lm <- mean((predict(linear_model, newdata = test_data) - test_data$mpg)^2)
+mse_ridge <- mean((ridge_predictions - test_data$mpg)^2)
+
+print(paste("MSE LM:", mse_lm))
+print(paste("MSE Ridge:", mse_ridge))
+```
+Linear model performed better then ridge in terms of mse.
+
+```{r}
+linear_model_coeffs <- coef(linear_model)
+ridge_coeffs <- coef(ridge_model)
+
+print("LM Coefficients:")
+print(linear_model_coeffs)
+print("Ridge Coefficients:")
+print(ridge_coeffs)
+```
+Ridge has performed shrinkage but not variable selection since none of the coefficients are 0 or close to 0.
+
+```{r}
+
+```
+
+
+# Problem 2
+
+```{r}
+set.seed(42)
+data("swiss")
+index <- createDataPartition(swiss$Fertility, p = 0.8, list = FALSE)
+train_data <- swiss[index, ]
+test_data <- swiss[-index, ]
+
+linear_model <- lm(Fertility ~ ., data = train_data)
+
+summary(linear_model)
+
+```
+Education: -1.00350 Catholic:0.11794  Infant.Mortality: 0.89442
+
+```{r}
+X_train <- model.matrix(Fertility ~ ., data = train_data)[, -1]
+y_train <- train_data$Fertility
+
+lasso_model <- cv.glmnet(X_train, y_train, alpha = 1, lambda = lambda_values, parallel = TRUE)
+
+plot(lasso_model)
+```
+
+```{r}
+min_lambda <- lasso_model$lambda.min
+cat("Minimum lambda:", min_lambda)
+```
+```{r}
+X_test <- model.matrix(Fertility ~ ., data = test_data)[, -1]
+y_test <- test_data$Fertility
+lasso_predictions <- predict(lasso_model, newx = X_test, s = min_lambda)
+```
+
+```{r}
+mse_lm <- mean((predict(linear_model, newdata = test_data) - test_data$Fertility)^2)
+mse_lasso <- mean((lasso_predictions - test_data$Fertility)^2)
+
+print(paste("MSE LM:", mse_lm))
+print(paste("MSE Lasso:", mse_lasso))
+```
+Lasso MSE is much higher then lm which uses all of the predictors
+
+```{r}
+linear_model_coeffs <- coef(linear_model)
+lasso_coeffs <- coef(lasso_model)
+
+print("LM Coefficients:")
+print(linear_model_coeffs)
+print("Lasso Coefficients:")
+print(lasso_coeffs)
+```
+Lasso did eliminate Agriculture and examination, which were the features with high t stats in the lm.
+
+
+# Problem 3
+```{r}
+setwd("D:/2024_Data/HW3")
+# install.packages(c("mgcv", "visreg"))
+library(mgcv)
+library(visreg)
+
+df <- read.csv("Concrete_Data.csv")
+```
+
+```{r}
+model_gam <- gam(ConcreteCompressiveStrength ~ Cement + BlastFurnaceSlag + FlyAsh + Water + Superplasticizer + CoarseAggregate, data = df)
+
+summary(model_gam)
+```
+
+```{r}
+model_gam_smoothed <- gam(ConcreteCompressiveStrength ~ s(Cement) + s(BlastFurnaceSlag) + s(FlyAsh) + s(Water) + s(Superplasticizer) + s(CoarseAggregate), data = df)
+
+summary(model_gam_smoothed)
+```
+The r2 value is better for the smoothed model then the normal model.
+```{r}
+visreg(model_gam, scale = "response", plot = TRUE)
+```
+
+```{r}
+visreg(model_gam_smoothed, scale = "response", plot = TRUE)
+```
+
+Linear did better at the extreme values. Also the extreme values seem to be at about the same place in all of the graphs.
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+```

@@ -1,0 +1,349 @@
+---
+title: "naive"
+author: "Parth Patel"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+# 2.1
+```{r}
+library(caret)
+library(MASS)  # The package that contains the abalone dataset
+# library(glmnet)
+library(corrplot)
+
+url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data"
+abalone <- read.csv(url, header = FALSE, sep = ",")
+colnames(abalone) <- c('Sex', 'Length', 'Diameter', 'Height', 'WholeWeight', 'ShuckedWeight', 'VisceraWeight', 'ShellWeight', 'Rings')
+head(abalone)
+```
+
+
+```{r}
+abalone <- abalone[abalone$Sex %in% c("M", "F"), ]
+unique(abalone$Sex)
+```
+
+```{r}
+index <- createDataPartition(abalone$Sex, p = 0.8, list = FALSE)
+train_data <- abalone[index, ]
+test_data <- abalone[-index, ]
+train_data$Sex <- ifelse(train_data$Sex == "M", 1, 0)
+```
+
+```{r}
+model <- glm(Sex ~ ., data = train_data, family = "binomial")
+summary(model)
+```
+Only the shucked weight has a acceptable z-value
+Diameter and VisceraWeight might be acceptable
+
+
+```{r}
+
+confint(model)
+```
+The predictors that contain 0 are the ones that have the high z-values and the ones where we accept the null hypothesis.
+
+```{r}
+predictions <- predict(model, newdata = test_data, type = "response")
+
+predicted_labels <- factor(ifelse(predictions > 0.5, "M", "F"), levels = c("M", "F"))
+
+actual_labels <- factor(test_data$Sex, levels = c("M", "F"))
+
+conf_matrix <- confusionMatrix(predicted_labels, actual_labels)
+print(conf_matrix)
+```
+
+```{r}
+# install.packages("pROC")
+library(pROC)
+roc_curve <- roc(test_data$Sex, predictions)
+plot(roc_curve, main = "ROC Curve")
+```
+The model is doing better then the random classifier but not by a big margin.
+
+
+```{r}
+library(corrplot)
+predictors <- subset(abalone, select = -Sex)
+correlation_matrix <- cor(predictors)
+corrplot(correlation_matrix)
+```
+The predictors seem to be very corelated, 
+-------------finish answering ---------------
+
+# 2.2
+
+```{r}
+# install.packages("e1071")
+library(e1071)
+
+url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/mushroom/agaricus-lepiota.data"
+mushroom <- read.csv(url, header = FALSE, sep = ",", na.strings = "?")
+colnames(mushroom) <- c("Type", "CapShape", "CapSurface", "CapColor", "Bruises", "Odor", "GillAttachment",
+                             "GillSpacing", "GillSize", "GillColor", "StalkShape", "StalkRoot",
+                             "StalkSurfaceAboveRing", "StalkSurfaceBelowRing", "StalkColorAboveRing",
+                             "StalkColorBelowRing", "VeilType", "VeilColor", "RingNumber",
+                             "RingType", "SporePrintColor", "Population", "Habitat")
+mushroom
+
+```
+
+```{r}
+mushroom <- na.omit(mushroom)
+```
+i will be removing the missing data rows
+
+
+```{r}
+index <- sample(1:nrow(mushroom), 0.8 * nrow(mushroom))
+train_data <- mushroom[index, ]
+test_data <- mushroom[-index, ]
+
+nb_model <- naiveBayes(Type ~ ., data = train_data)
+
+```
+
+```{r}
+train_predictions <- predict(nb_model, newdata = train_data)
+test_predictions <- predict(nb_model, newdata = test_data)
+head(train_predictions)
+head(train_data$Type)
+```
+
+
+```{r}
+train_probs <- predict(nb_model, newdata = train_data, type = "raw")
+
+# Determine predicted classes
+train_predictions <- factor(ifelse(train_probs[,'e'] > 0.5, "e", "p"), levels = c('e','p'))
+
+train_accuracy <- sum(train_predictions == train_data$Type) / nrow(train_data)
+
+cat("Training Accuracy:", train_accuracy, "\n")
+```
+
+```{r}
+test_probs <- predict(nb_model, newdata = test_data, type = "raw")
+
+# Determine predicted classes
+test_predictions <- factor(ifelse(test_probs[,'e'] > 0.5, "e", "p"), levels = c('e','p'))
+
+test_accuracy <- sum(test_predictions == test_data$Type) / nrow(test_data)
+
+cat("testing Accuracy:", test_accuracy, "\n")
+```
+
+```{r}
+conf_matrix <- table(Predicted = test_predictions, Actual = test_data$Type)
+print(conf_matrix)
+```
+48 false positives
+
+
+# 2.3
+```{r}
+setwd("D:/2024_Data/HW2")
+
+# install.packages("boot")
+library(caret)
+library(boot)
+
+yacht_data <- read.table("yacht_hydrodynamics.data", header = FALSE)
+print(head(yacht_data))
+# Specify feature labels and column names
+colnames(yacht_data) <- c("Longitudinal.position", "Prismatic.coefficient", "Length.displacement", 
+                    "Beam.draught.ratio", "Length.beam.ratio", "Froude.number", "Residuary.resistance")
+
+
+```
+
+```{r}
+index <- createDataPartition(yacht_data$Residuary.resistance, p = 0.8, list = FALSE)
+train_data <- yacht_data[index, ]
+test_data <- yacht_data[-index, ]
+
+linear_model <- lm(Residuary.resistance ~ ., data = train_data)
+
+```
+
+```{r}
+train_predictions <- predict(linear_model, newdata = train_data)
+train_MSE <- mean((train_data$Residuary.resistance - train_predictions)^2)
+train_RMSE <- sqrt(train_MSE)
+train_R2 <- summary(linear_model)$r.squared
+
+cat("Training MSE:", train_MSE, "\n")
+cat("Training RMSE:", train_RMSE, "\n")
+cat("Training R-squared:", train_R2, "\n")
+```
+
+```{r}
+# used to chat to help write
+bootstrap_results <- boot(data = yacht_data, statistic = function(data, indices) {
+  sampled_data <- data[indices, ]
+  model <- lm(Residuary.resistance ~ ., data = sampled_data)
+  predictions <- predict(model, newdata = sampled_data)
+  MSE <- mean((sampled_data$Residuary.resistance - predictions)^2)
+  RMSE <- sqrt(MSE)
+  R2 <- summary(model)$r.squared
+  c(RMSE, R2)
+}, R = 1000)
+```
+
+```{r}
+hist(bootstrap_results$t[, 1], main = "Bootstrap", xlab = "RMSE")
+
+```
+
+```{r}
+mean_RMSE_bootstrap <- mean(bootstrap_results$t[, 1])
+mean_R2_bootstrap <- mean(bootstrap_results$t[, 2])
+
+cat("Bootstrap mean RMSE:", mean_RMSE_bootstrap, "\n")
+cat("Bootstrap mean R-squared:", mean_R2_bootstrap, "\n")
+
+```
+The rmse is much better for bootstrap method, but the r^2 value does not change
+
+```{r}
+test_predictions <- predict(linear_model, newdata = test_data)
+test_MSE <- mean((test_data$Residuary.resistance - test_predictions)^2)
+test_RMSE <- sqrt(test_MSE)
+test_R2 <- summary(linear_model)$r.squared
+
+cat("Test MSE:", test_MSE, "\n")
+cat("Test RMSE:", test_RMSE, "\n")
+cat("Test R-squared:", test_R2, "\n")
+
+# used to chat 
+bootstrap_test_results <- boot(data = test_data, statistic = function(data, indices) {
+  sampled_data <- data[indices, ]
+  predictions <- predict(linear_model, newdata = sampled_data)
+  MSE <- mean((sampled_data$Residuary.resistance - predictions)^2)
+  RMSE <- sqrt(MSE)
+  R2 <- summary(linear_model)$r.squared
+  c(MSE, RMSE, R2)
+}, R = 1000)
+
+# Calculate mean MSE, RMSE, and R2 from bootstrap on the test set
+test_MSE_bootstrap <- mean(bootstrap_test_results$t[, 1])
+test_RMSE_bootstrap <- mean(bootstrap_test_results$t[, 2])
+test_R2_bootstrap <- mean(bootstrap_test_results$t[, 3])
+
+cat("Bootstrap Test MSE:", test_MSE_bootstrap, "\n")
+cat("Bootstrap Test RMSE:", test_RMSE_bootstrap, "\n")
+cat("Bootstrap Test R-squared:", test_R2_bootstrap, "\n")
+```
+For the test they are very identical no real difference.
+
+
+# 2.4
+
+```{r}
+library(caret)
+#library(glmnet)
+german <- read.table("german.data-numeric", header = FALSE)
+
+# Specify column names and class variable
+feature_labels <- paste0("V", 1:(ncol(german) - 1))
+colnames(german) <- c(feature_labels, "Class")
+german
+```
+
+```{r}
+index <- createDataPartition(german$Class, p = 0.8, list = FALSE)
+train_data <- german[index, ]
+test_data <- german[-index, ]
+```
+
+```{r}
+train_data$Class <- factor(ifelse(train_data$Class == 1, 0, 1), levels = c(0,1))
+
+logistic_model <- glm(Class ~ ., data = train_data, family = "binomial")
+```
+
+```{r}
+train_predictions <- predict(logistic_model, newdata = train_data, type = "response")
+
+train_predicted_labels <- factor(ifelse(train_predictions > 0.5, 1, 0), levels = c(0,1))
+```
+
+```{r}
+train_conf_matrix <- confusionMatrix(train_predicted_labels, train_data$Class)
+train_precision <- train_conf_matrix$byClass["Pos Pred Value"]
+train_recall <- train_conf_matrix$byClass["Sensitivity"]
+train_f1 <- 2 * (train_precision * train_recall) / (train_precision + train_recall)
+
+cat("Training Precision:", train_precision, "\n")
+cat("Training Recall:", train_recall, "\n")
+cat("Training F1:", train_f1, "\n")
+```
+
+```{r}
+train_data$Class <- as.factor(make.names(train_data$Class))
+
+ctrl <- trainControl(method = "cv", number = 10, classProbs = TRUE)
+cv_model <- train(Class ~ ., data = train_data, method = "glm", family = "binomial", trControl = ctrl)
+
+```
+
+```{r}
+cv_conf_matrix <- confusionMatrix(predict(cv_model, newdata = train_data), train_data$Class)
+
+precision <- cv_conf_matrix$byClass["Pos Pred Value"]
+recall <- cv_conf_matrix$byClass["Sensitivity"]
+f1 <- 2 * (precision * recall) / (precision + recall)
+
+cat("CV Train Precision:", precision, "\n")
+cat("CV Train Recall:", recall, "\n")
+cat("CV Train F1:", f1, "\n")
+
+
+```
+The metrics are very similar for the normal and CV model.
+
+
+```{r}
+test_predictions <- predict(logistic_model, newdata = test_data, type = "response")
+test_predicted_labels <- factor(ifelse(test_predictions > 0.5, 1, 0), levels = c(0,1))
+```
+
+
+```{r}
+test_data$Class <- factor(ifelse(test_data$Class == 1, 0, 1), levels = c(0,1))
+test_conf_matrix <- confusionMatrix(test_predicted_labels, test_data$Class)
+test_precision <- test_conf_matrix$byClass["Pos Pred Value"]
+test_recall <- test_conf_matrix$byClass["Sensitivity"]
+test_f1 <- 2 * (test_precision * test_recall) / (test_precision + test_recall)
+
+cat("Test Precision:", test_precision, "\n")
+cat("Test Recall:", test_recall, "\n")
+cat("Test F1:", test_f1, "\n")
+```
+
+
+```{r}
+cv_test_predictions <- predict(cv_model, newdata = test_data)
+
+cv_test_predicted_labels <- factor(ifelse(cv_test_predictions =="X0", 0, 1), levels = c(0,1))
+
+cv_test_conf_matrix <- confusionMatrix(cv_test_predicted_labels, test_data$Class)
+cv_test_precision <- cv_test_conf_matrix$byClass["Pos Pred Value"]
+cv_test_recall <- cv_test_conf_matrix$byClass["Sensitivity"]
+cv_test_f1 <- 2 * (cv_test_precision * cv_test_recall) / (cv_test_precision + cv_test_recall)
+
+cat("CV Test Precision:", cv_test_precision, "\n")
+cat("CV Test Recall:", cv_test_recall, "\n")
+cat("CV Test F1:", cv_test_f1, "\n")
+
+```
+Again the metrics are almost identical to each other.

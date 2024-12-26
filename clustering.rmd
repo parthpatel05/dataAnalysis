@@ -1,0 +1,188 @@
+---
+title: "Clustering/PCA"
+author: "Parth Patel"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+
+
+
+
+# 2.1
+```{r}
+# used gpt to generate this block
+library(ggplot2)
+
+# Load Wine dataset
+wine_data <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data", header = FALSE)
+
+# Load column names separately
+column_names <- c("Class", "Alcohol", "Malic_acid", "Ash", "Alcalinity_of_ash", "Magnesium", "Total_phenols", "Flavanoids", "Nonflavanoid_phenols", "Proanthocyanins", "Color_intensity", "Hue", "OD280/OD315_of_diluted_wines", "Proline")
+
+colnames(wine_data) <- column_names
+head(wine_data)
+```
+Scaling should be used since some features like Magnesium are in the hundreds while Nonflavanoid_phenols is less then 1. 
+That is a big difference between the features
+
+```{r}
+pca_result <- prcomp(wine_data, scale. = TRUE)
+
+```
+
+
+```{r}
+biplot(pca_result, scale = 0, col = c("transparent", "red"))
+
+
+```
+we see that malic_acid is in the opposite direction, so it should be negative
+
+```{r}
+
+correlation_matrix <- cor(wine_data[, -1])
+correlation_with_hue <- correlation_matrix["Hue", ]
+opposite_feature <- which.min(correlation_with_hue)
+
+correlation_hue_opposite <- correlation_matrix["Hue", opposite_feature]
+
+print(paste("correlation coefficient between Hue and", colnames(wine_data)[opposite_feature+1], ":", correlation_hue_opposite))
+
+```
+
+
+```{r}
+screeplot(pca_result)
+
+variance_explained <- pca_result$sdev^2 / sum(pca_result$sdev^2) * 100
+print(paste("percentage of total variance explained by PC1:", round(variance_explained[1], 2), "%"))
+print(paste("percentage of total variance explained by PC2:", round(variance_explained[2], 2), "%"))
+```
+
+
+
+# 2.2
+
+```{r}
+# used chat for row to columns
+library(datasets) 
+library(tidyverse)
+library(factoextra)
+library(cluster) 
+
+data("USArrests")
+
+USArrests <- rownames_to_column(USArrests, var = "State")
+
+```
+
+Since the variables in the dataset are on different scales, it's generally a good practice to scale them
+```{r}
+scaled_data <- scale(USArrests[, -1])
+```
+
+```{r}
+wcss <- vector("numeric", length = 9)
+
+for (k in 2:10) {
+  kmeans_result <- kmeans(scaled_data, centers = k, nstart = 25)
+  wcss[k - 1] <- kmeans_result$tot.withinss 
+}
+```
+
+```{r}
+plot(2:10, wcss, type = "b", 
+     xlab = "k", 
+     ylab = "WCSS", 
+     main = "Elbow Method")
+
+```
+
+Optimal number of clusters in 4 since that is where the elbow occurs.
+
+```{r}
+optimal_k <- 4  
+kmeans_optimal <- kmeans(scaled_data, centers = optimal_k, nstart = 25)
+
+fviz_cluster(kmeans_optimal, data = scaled_data, geom = "point", stand = FALSE, 
+             ellipse.type = "convex", ggtheme = theme_minimal())
+
+```
+
+
+# 2.3
+
+```{r}
+library(tidyverse)  
+library(cluster)      
+
+wine_data <- read.csv("winequality-white.csv", header = TRUE, sep = ";")
+
+```
+
+```{r}
+wine_data
+```
+
+
+Need to scale the data since some features are decimals while others are in the hundreds
+```{r}
+scaled_data <- scale(wine_data[, -12])
+```
+
+```{r}
+hc_single <- hclust(dist(scaled_data), method = "single")
+
+hc_complete <- hclust(dist(scaled_data), method = "complete")
+```
+
+```{r}
+# used chat for this block
+merge_distance_single <- hc_single$height[which.max(diff(hc_single$height))]
+merge_distance_complete <- hc_complete$height[which.max(diff(hc_complete$height))]
+
+clusters_single <- cutree(hc_single, h = merge_distance_single)
+clusters_complete <- cutree(hc_complete, h = merge_distance_complete)
+
+```
+
+```{r}
+cat("single merge",merge_distance_single, "\n")
+cat("complete merge",merge_distance_complete)
+```
+
+
+```{r}
+cluster_means_single <- aggregate(scaled_data, by = list(clusters_single), FUN = mean)
+cluster_means_complete <- aggregate(scaled_data, by = list(clusters_complete), FUN = mean)
+
+feature_differences <- abs(cluster_means_single[, -1] - cluster_means_complete[, -1])
+max_diff_feature <- colnames(feature_differences)[apply(feature_differences, 2, which.max)]
+
+print(max_diff_feature[1])
+```
+
+
+
+```{r}
+cluster_sizes_single <- table(clusters_single)
+cluster_sizes_complete <- table(clusters_complete)
+
+print(cluster_sizes_single)
+print(cluster_sizes_complete)
+```
+
+they both produced the same distribution of clusters
+
+
+
+
+
+

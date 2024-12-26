@@ -1,0 +1,384 @@
+---
+title: "tree"
+author: "Parth Patel"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+## 3
+### a 
+```{r}
+library(ggplot2)
+
+data <- data.frame(
+  Obs = 1:7,
+  X1 = c(3, 2, 4, 1, 2, 4, 4),
+  X2 = c(4, 2, 4, 4, 1, 3, 1),
+  Y = c("Blue", "Blue", "Blue", "Blue", "Red", "Red", "Red")
+)
+
+p <- ggplot(data, aes(x = X1, y = X2, color = Y)) +
+  geom_point() 
+print(p)
+```
+
+### b
+```{r}
+p <- p + geom_abline(intercept = -0.5, slope = 1, color = "black") 
+print(p)
+```
+
+
+### c
+-.5+x-y<0 is red
+-.5+x-y>0 is blue
+b0 = -.5
+b1 = 1
+b2 = -1
+
+### d
+```{r}
+p <- p + geom_abline(intercept = -1, slope = 1, color = "Blue") +   # -1 + x - y = 0
+    geom_abline(intercept = 0, slope = 1, color = "Red")    # -0.5 + x - y = 0
+print(p)
+```
+
+### e
+```{r}
+p + geom_point(aes(x = 2, y = 2), color = "red", size = 5, alpha = 0.3, shape = 1) + 
+geom_point(aes(x = 4, y = 4), color = "red", size = 5, alpha = 0.3, shape = 1) + 
+  geom_point(aes(x = 2, y = 1), color = "blue", size = 5, alpha = 0.3, shape = 1) + 
+  geom_point(aes(x = 4, y = 3), color = "blue", size = 5, alpha = 0.3, shape = 1) 
+#print(p)
+```
+
+### f
+That point would not affect the hyperplane since it is not a support vector, also it is not close to the hyperplane that it might become a support vector
+### g 
+```{r}
+
+data <- data.frame(
+  Obs = 1:7,
+  X1 = c(3, 2, 4, 1, 2, 4, 4),
+  X2 = c(4, 2, 4, 4, 1, 3, 1),
+  Y = c("Blue", "Blue", "Blue", "Blue", "Red", "Red", "Red")
+)
+
+ggplot(data, aes(x = X1, y = X2, color = Y)) +
+  geom_point() +
+  geom_abline(intercept = 5, slope = -1, color = "black")
+```
+
+
+### h
+```{r}
+
+data <- data.frame(
+  X1 = c(3, 2, 4, 1, 2, 4, 4,2),
+  X2 = c(4, 2, 4, 4, 1, 3, 1,4),
+  Y = c("Blue", "Blue", "Blue", "Blue", "Red", "Red", "Red", "Red")
+)
+
+ggplot(data, aes(x = X1, y = X2, color = Y)) +
+  geom_point()
+```
+
+
+# 2.1
+```{r}
+library(rpart)
+
+```
+
+```{r}
+simulate_dataset <- function(mu1, mu2, sigma, n_samples) {
+  class1_samples <- rnorm(n_samples, mean = mu1, sd = sigma)
+  class2_samples <- rnorm(n_samples, mean = mu2, sd = sigma)
+  
+  class1_df <- data.frame(feature = class1_samples, class = 1)
+  class2_df <- data.frame(feature = class2_samples, class = 2)
+  
+  dataset <- rbind(class1_df, class2_df)
+  
+  return(dataset)
+}
+
+data <- simulate_dataset(5, -5, 2, 100)
+data
+```
+
+
+```{r}
+library(rpart.plot)
+tree <- rpart(class ~ feature, data = data)
+rpart.plot(tree, extra = 1)
+```
+
+```{r}
+split_info <- tree$splits
+cat("Threshold:",split_info[4])
+```
+
+
+```{r}
+summary(data$feature)
+```
+The split happens very close to the median point which splits the 2 distributions.
+
+```{r}
+cat("Num nodes: ",length(tree$frame$var))
+```
+------------doooo this------
+hand calcukate the things
+```{r}
+gini_values <- tree$cptable[, c("nsplit", "xerror")]
+entropy_values <- tree$cptable[, c("nsplit", "xstd")]
+
+print("Gini index at each node:")
+print(gini_values)
+print("Entropy at each node:")
+print(entropy_values)
+```
+
+
+```{r}
+tree$splits
+```
+
+```{r}
+data <- simulate_dataset(1, -1, 2, 100)
+data
+tree <- rpart(class ~ feature, data = data)
+rpart.plot(tree, extra = 1)
+```
+
+```{r}
+cat("Num nodes: ",length(tree$frame$var))
+
+```
+This tree has more nodes since the distributions will overlap.
+```{r}
+pruned_tree <- prune(tree, cp = 0.1)
+
+rpart.plot(pruned_tree, box.palette = "Greens")
+```
+
+```{r}
+cat("Num nodes: ",length(pruned_tree$frame$var))
+pruned_tree$splits
+```
+It is a tree with only one split, more generalized.
+```{r}
+```
+# 2.2
+```{r}
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(randomForest)
+```
+
+```{r}
+red_wine <- read.csv("winequality-red.csv", header = TRUE, sep = ";")
+
+white_wine <- read.csv("winequality-white.csv", header = TRUE, sep = ";")
+
+red_wine
+```
+
+```{r}
+split_data <- function(data, split_ratio = 0.8) {
+  indices <- sample(1:nrow(data), size = round(split_ratio * nrow(data)), replace = FALSE)
+  train_data <- data[indices, ]
+  test_data <- data[-indices, ]
+  return(list(train = train_data, test = test_data))
+}
+```
+
+```{r}
+red_split <- split_data(red_wine)
+red_train <- red_split$train
+red_test <- red_split$test
+
+
+white_split <- split_data(white_wine)
+white_train <- white_split$train
+white_test <- white_split$test
+```
+
+for red
+```{r}
+red_tree <- rpart(quality ~ ., data = red_train, method = "class")
+
+
+rpart.plot(red_tree)
+```
+
+```{r}
+red_factor <- factor(red_test$quality, levels = 3:8)
+red_pred <- predict(red_tree, newdata = red_test, type = "class")
+red_cm <- confusionMatrix(red_pred, red_factor)
+print("CM Red Wine:")
+print(red_cm)
+```
+
+```{r}
+white_tree <- rpart(quality ~ ., data = white_train, method = "class")
+
+
+rpart.plot(white_tree)
+```
+
+```{r}
+white_factor <- factor(white_test$quality, levels = 3:9)
+white_pred <- predict(white_tree, newdata = white_test, type = "class")
+white_cm <- confusionMatrix(white_pred, white_factor)
+print("CM White Wine:")
+print(white_cm)
+```
+In terms of accuracy they are similar, but red wine has more depth and more splits then white. Both used alcohol to split, but white one relied on it more.
+
+
+```{r}
+print("l")
+```
+
+```{r}
+red_forest <- randomForest(quality ~ ., data = red_train, method = "class")
+
+
+red_forest_pred <- predict(red_forest, newdata = red_test, type = "class")
+rounded_predictions <- round(red_forest_pred)
+red_pred_factor <- as.factor(rounded_predictions)
+levels(red_pred_factor) <- levels(red_factor)
+
+red_forest_cm <- confusionMatrix(red_pred_factor, red_factor)
+print("CM Red Wine Random Forest:")
+print(red_forest_cm)
+```
+
+
+
+```{r}
+white_tree <- randomForest(quality ~ ., data = white_train, method = "class")
+
+white_forest_pred <- predict(white_forest, newdata = white_test, type = "class")
+rounded_predictions <- round(white_forest_pred)
+white_pred_factor <- as.factor(rounded_predictions)
+levels(white_pred_factor) <- levels(white_factor)
+
+white_forest_cm <- confusionMatrix(white_pred_factor, white_factor)
+print("CM White Wine Random Forest:")
+print(white_forest_cm)
+
+```
+The random forest models had worse accuracies since they were not predicting all of the classes. 
+
+# 2.3
+```{r}
+library(tm)
+library(e1071)
+```
+
+```{r}
+sms_data <- read.delim("SMSSpamCollection", header = FALSE, stringsAsFactors = FALSE, sep = "\t")
+colnames(sms_data) <- c("class", "text")
+```
+
+```{r}
+# used chat gpt to generate this
+corpus <- Corpus(VectorSource(sms_data$text))
+
+corpus <- tm_map(corpus, content_transformer(tolower))
+
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+corpus <- tm_map(corpus, stripWhitespace)
+
+corpus <- tm_map(corpus, removePunctuation)
+```
+
+```{r}
+dtm <- DocumentTermMatrix(corpus)
+
+freq_terms <- findFreqTerms(dtm, 10)
+```
+
+```{r}
+train_indices <- sample(1:nrow(sms_data), 0.8 * nrow(sms_data))
+train_data <- sms_data[train_indices, ]
+test_data <- sms_data[-train_indices, ]
+```
+
+```{r}
+head(train_data)
+```
+
+```{r}
+# used chat for this portion
+train_corpus <- Corpus(VectorSource(train_data$text))
+test_corpus <- Corpus(VectorSource(test_data$text))
+
+train_dtm <- DocumentTermMatrix(train_corpus)
+test_dtm <- DocumentTermMatrix(test_corpus)
+
+train_matrix <- as.matrix(train_dtm)
+test_matrix <- as.matrix(test_dtm)
+
+train_boolean <- ifelse(train_matrix > 0, 1, 0)
+test_boolean <- ifelse(test_matrix > 0, 1, 0)
+```
+
+
+```{r}
+train_labels <- as.numeric(train_data$class == "spam")
+test_labels <- as.numeric(test_data$class == "spam")
+
+svm_model <- svm(train_boolean, train_labels, kernel = "linear")
+```
+
+```{r}
+train_pred <- predict(svm_model, train_boolean)
+train_pred <- ifelse(train_pred > 0, 1, 0)
+train_accuracy <- sum(train_pred == train_labels) / length(train_pred)
+
+
+cat("Training Set Accuracy:", train_accuracy)
+```
+
+
+
+```{r}
+test_corpus <- Corpus(VectorSource(test_data$text))
+test_corpus <- tm_map(test_corpus, content_transformer(tolower))
+test_corpus <- tm_map(test_corpus, removeWords, stopwords("english"))
+test_corpus <- tm_map(test_corpus, stripWhitespace)
+test_corpus <- tm_map(test_corpus, removePunctuation)
+
+test_dtm <- DocumentTermMatrix(test_corpus, control = list(dictionary = Terms(train_dtm)))
+
+test_matrix <- as.matrix(test_dtm)
+
+test_boolean <- ifelse(test_matrix > 0, 1, 0)
+```
+
+```{r}
+test_pred <- predict(svm_model, test_boolean)
+test_pred <- ifelse(test_pred > 0, 1, 0)
+test_accuracy <- sum(test_pred == test_labels) / length(test_pred)
+
+cat("Test Set Accuracy:", test_accuracy)
+```
+
+
+
+
+
+```{r}
+
+```

@@ -1,0 +1,179 @@
+---
+title: "Metrics and Linear"
+author: "Parth Patel"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+
+# 2.1
+```{r}
+data(iris)
+
+boxplot(iris[, 1:4], main="boxplots")
+
+iqr_feature <- which.max(apply(iris[, 1:4], 2, IQR))
+iqr_feature
+
+```
+Petal Length has the highest IQR
+
+```{r}
+# partially generated with ChatGPT
+empirical <- apply(iris[, 1:4], 2, sd)
+
+parametric <- apply(iris[, 1:4], 2, sd, na.rm = TRUE)
+
+print("Empirical Standard Deviations:")
+print(empirical)
+print("Parametric Standard Deviations:")
+print(parametric)
+
+```
+Yes the parametric do agree with the emperical
+
+
+```{r}
+library(ggplot2)
+
+ggplot(iris, aes(x = Species, y = Sepal.Length, fill = Species)) +
+  geom_boxplot() +
+  labs(title = "Boxplots Sepal.Length")
+
+ggplot(iris, aes(x = Species, y = Sepal.Width, fill = Species)) +
+  geom_boxplot() +
+  labs(title = "Boxplots Sepal.Width")
+
+ggplot(iris, aes(x = Species, y = Petal.Length, fill = Species)) +
+  geom_boxplot() +
+  labs(title = "Boxplots Petal.Length")
+
+ggplot(iris, aes(x = Species, y = Petal.Width, fill = Species)) +
+  geom_boxplot() +
+  labs(title = "Boxplots Petal.Width")
+
+```
+
+Setosa displays the biggest one
+
+# 2.2
+```{r}
+data(trees)
+summary(trees)
+
+```
+
+```{r}
+# par(mfrow=c(2,2))
+hist(trees$Girth, main="Girth")
+hist(trees$Height, main="Height")
+hist(trees$Volume, main="Volume")
+
+```
+
+Height is the only one that looks normally distributed.
+Girth and Volume seem to be positively skewed.
+
+```{r}
+# install.packages("moments")
+library(moments)
+
+skewness_vals <- sapply(trees, skewness)
+
+print("Skewness:")
+print(skewness_vals)
+
+```
+According to the values Girth and Volume are positively skewed, while height is negatively skewed but not by alot.
+
+# 2.3
+```{r}
+url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/auto-mpg/auto-mpg.data"
+auto <- read.csv(url, header = FALSE, sep = "")
+
+colnames(auto) <- c("mpg", "cylinders", "displacement", "horsepower", "weight", "acceleration", "model_year", "origin", "car_name")
+
+auto$horsepower[auto$horsepower == "?"] <- NA
+
+mean_before <- mean(as.numeric(auto$horsepower), na.rm = TRUE)
+
+print("mean before:")
+print(mean_before)
+
+auto$horsepower <- as.numeric(auto$horsepower)
+auto$horsepower[is.na(auto$horsepower)] <- median(auto$horsepower, na.rm = TRUE)
+
+mean_after <- mean(auto$horsepower)
+
+print("mean after:")
+print(mean_after)
+```
+The mean does not really get affected that much.
+
+# 2.4
+```{r}
+# install.packages("MASS")
+library(MASS)
+data(Boston)
+linear_model <- lm(medv ~ lstat, data = Boston)
+
+plot(Boston$lstat, Boston$medv, main = "linear fit", xlab = "lstat", ylab = "medv")
+abline(linear_model)
+```
+
+```{r}
+plot(fitted(linear_model), residuals(linear_model), main = "fitted v residuals", xlab = "fitted", ylab = "residuals")
+
+lines(lowess(Boston$lstat, residuals(linear_model)), col = "red")
+```
+
+There is a possible non-linear relationship since we see the line concaving.
+
+
+```{r}
+new_data <- data.frame(lstat = c(5, 10, 15))
+
+conf <- predict(linear_model, newdata = new_data, interval = "confidence", level = 0.95)
+
+pred <- predict(linear_model, newdata = new_data, interval = "prediction", level = 0.95)
+
+print("confidence:")
+print(conf)
+
+print("prediction:")
+print(pred)
+```
+
+No they are not the same, because prediction and confidence intervals are not the same thing.
+
+
+```{r}
+# nonlinear_model <- lm(medv ~ poly(lstat, 2), data = Boston)
+nonlinear_model <- lm(medv ~ lstat + I(lstat^2), data = Boston)
+
+
+r2_linear <- summary(linear_model)$r.squared
+r2_nonlinear <- summary(nonlinear_model)$r.squared
+
+print("linear:")
+print(r2_linear)
+
+print("non-linear:")
+print(r2_nonlinear)
+
+# generated with chatgpt
+ggplot(Boston, aes(x = lstat, y = medv)) +
+  geom_point()+
+  stat_smooth(method = "lm", formula = y ~ x , se = FALSE, col = "blue") +
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), se = FALSE, col = "red") +
+  labs(title = "Non-linear Regression: medv ~ lstat + lstat^2", x = "lstat", y = "medv")
+
+```
+
+The r2 is better for the non-linear one. As we had predicted there was some non-linear relationship.
